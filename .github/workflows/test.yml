@@ -15,7 +15,6 @@ jobs:
       - name: Unzip project
         run: |
           unzip -o createblock.zip -d extracted
-          echo "--- extracted tree ---"
           find extracted -maxdepth 2
 
       - name: Find project root
@@ -39,23 +38,20 @@ jobs:
 
       - name: Build
         working-directory: ${{ steps.findroot.outputs.root }}
-        continue-on-error: true
-        run: gradle build --no-daemon --stacktrace 2>&1 | tee build-output.txt
+        run: gradle build --no-daemon --stacktrace
 
-      - name: Show errors
+      - name: List what got built
         if: always()
         working-directory: ${{ steps.findroot.outputs.root }}
         run: |
-          echo "=================== ERRORS ==================="
-          grep -E "error:|FAILED|Caused by|Could not|cannot find|Unresolved" build-output.txt || echo "no error lines matched"
-          echo ""
-          echo "=================== LAST 80 LINES ==================="
-          tail -80 build-output.txt
+          echo "=== build/libs contents ==="
+          ls -la build/libs/ || echo "no build/libs folder"
 
       - name: Upload the jar
-        if: success()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: createblock-mod-jar
           path: ${{ steps.findroot.outputs.root }}/build/libs/*.jar
+          if-no-files-found: warn
           retention-days: 30
