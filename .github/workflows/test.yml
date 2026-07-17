@@ -15,6 +15,71 @@ jobs:
       - name: Unzip project
         run: |
           unzip -o createblock.zip -d extracted
+          echo "--- extracted tree ---"
+          find extracted -maxdepth 2
+
+      - name: Find project root
+        id: findroot
+        run: |
+          ROOT=$(dirname "$(find extracted -name 'build.gradle' | head -1)")
+          echo "root=$ROOT" >> $GITHUB_OUTPUT
+          echo "Project root is: $ROOT"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install Gradle 8.1.1
+        run: |
+          wget -q https://services.gradle.org/distributions/gradle-8.1.1-bin.zip
+          unzip -q gradle-8.1.1-bin.zip -d $HOME
+          echo "$HOME/gradle-8.1.1/bin" >> $GITHUB_PATH
+
+      - name: Build
+        working-directory: ${{ steps.findroot.outputs.root }}
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Find the jar
+        if: always()
+        run: |
+          echo "=== ALL jars in the workspace ==="
+          find . -name "*.jar" -not -path "*/gradle-8.1.1/*" 2>/dev/null || echo "none found"
+          echo ""
+          echo "=== all build directories ==="
+          find . -type d -name "build" -not -path "*/gradle-8.1.1/*" 2>/dev/null || echo "none found"
+          echo ""
+          echo "=== project root was: ${{ steps.findroot.outputs.root }} ==="
+          ls -la "${{ steps.findroot.outputs.root }}" || echo "root not accessible"
+          echo ""
+          echo "=== contents of root/build if it exists ==="
+          ls -laR "${{ steps.findroot.outputs.root }}/build" 2>/dev/null | head -50 || echo "no build folder"
+
+      - name: Upload any jars found
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: createblock-mod-jar
+          path: |
+            **/build/libs/*.jar
+          if-no-files-found: warn
+          retention-days: 30
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: |
+          unzip -o createblock.zip -d extracted
           find extracted -maxdepth 2
 
       - name: Find project root
