@@ -1,0 +1,61 @@
+name: Unzip and Build Createblock
+
+# Runs when you push, and can be started by hand from the Actions tab.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Unzip the project
+        run: |
+          unzip -o createblock.zip -d extracted
+          echo "--- extracted tree (top 2 levels) ---"
+          find extracted -maxdepth 2
+
+      # The zip contains a top-level 'createblock/' folder, so the real
+      # project root is extracted/createblock. We detect it either way.
+      - name: Locate the project root
+        id: findroot
+        run: |
+          ROOT=$(dirname "$(find extracted -name 'build.gradle' | head -1)")
+          echo "Project root: $ROOT"
+          echo "root=$ROOT" >> $GITHUB_OUTPUT
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle 8.1.1
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.1.1'
+
+      - name: Build
+        working-directory: ${{ steps.findroot.outputs.root }}
+        run: gradle build --no-daemon --stacktrace
+
+      - name: Upload the jar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: createblock-mod-jar
+          path: ${{ steps.findroot.outputs.root }}/build/libs/*.jar
+          retention-days: 30
+
+      - name: Upload logs if the build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ${{ steps.findroot.outputs.root }}/build/reports/
+          retention-days: 7
